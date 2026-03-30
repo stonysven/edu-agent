@@ -1,0 +1,10 @@
+{
+  // 为什么固定解释器路径：
+  // 因为很多“明明装了依赖却运行失败”的问题，本质上都是 VS Code 没选对 Python 解释器。
+  // 把解释器指向项目自己的 `.venv` 后，调试、运行、补全和测试都会更稳定。
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+
+  // 为什么把终端激活环境打开：
+  // 这样你在 VS Code 内置终端执行 Python 命令时，会优先使用项目虚拟环境。
+  "python.terminal.activateEnvironment": true
+}

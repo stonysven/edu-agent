@@ -1,0 +1,39 @@
+{
+  // 为什么提供这个调试配置：
+  // 因为 VS Code 的断点调试只有在“启动方式”和“Python 解释器”正确时才会顺畅。
+  // 把配置固化到项目里后，你就不需要每次手动填写启动参数了。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // 这个配置的作用：
+      // 直接用 VS Code 启动当前 FastAPI 服务，并允许你在 Python 代码里下断点。
+      "name": "Debug FastAPI (Uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      // 为什么使用 module 模式：
+      // 因为 `uvicorn` 通常就是通过 `python -m uvicorn` 的方式启动。
+      // 这种方式和命令行行为更一致。
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      // 为什么指定 cwd：
+      // 这样 VS Code 在启动时会把项目根目录作为当前工作目录，
+      // `.env`、`app` 包导入和相对路径都会更稳定。
+      "cwd": "${workspaceFolder}",
+      // 为什么显式指定 envFile：
+      // 这样调试器启动的进程也会加载项目根目录中的 `.env` 文件。
+      "envFile": "${workspaceFolder}/.env",
+      // 这一项可以让你在进入第三方库时仍然保持聚焦在自己代码上。
+      "justMyCode": true,
+      // 为什么使用 integratedTerminal：
+      // 这样你能直接看到 uvicorn 日志、报错和 print 输出，更适合后端排查。
+      "console": "integratedTerminal"
+    }
+  ]
+}
