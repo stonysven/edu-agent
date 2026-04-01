@@ -1,72 +1,129 @@
 """
 这个文件的作用：
-定义当前项目的最小编排器（Orchestrator）。
+定义当前项目的多 Agent 编排器（Orchestrator）。
 
-为什么需要 Orchestrator：
-虽然当前版本只有一个 `simple_agent`，
-但从工程分层角度看，接口层最好不要直接依赖具体 Agent。
+为什么多 Agent 系统里必须有 Orchestrator：
+因为当系统里不止一个 Agent 时，
+就需要一个统一的“调度中心”来决定：
+- 先做什么
+- 该调用哪个 Agent
+- 最后怎么把结果统一返回
 
-更合理的职责分工是：
-- API 层：接收请求、返回响应
-- Orchestrator 层：决定调用哪个 Agent
-- Agent 层：真正执行智能逻辑
-
-这样做的好处是：
-1. API 层更干净
-2. 后续增加多 Agent 时改动更小
-3. 系统边界更清晰
-
-概念解释注释块：Orchestrator 的角色
+概念解释注释块：Orchestrator 的作用
 --------------------------------------------------
-Orchestrator 可以理解为“调度员”或“编排器”。
+Orchestrator 可以理解为“总调度器”。
 
-它不一定亲自完成任务，
-但它负责决定：
-- 这个请求应该交给谁处理
-- 是否要先查记忆
-- 是否要先做 RAG
-- 是否需要多 Agent 协作
+它本身不一定亲自回答问题，
+但它负责把整个流程串起来：
+1. 收到用户输入
+2. 调用 PlanningAgent 判断意图
+3. 选择 QAAgent 或 ToolAgent
+4. 把结果整理成统一结构返回
 
-当前最小版本里，
-它只做一件事：
-把用户输入交给 `simple_agent`。
+为什么这样做比“让一个 Agent 全做完”更好：
+因为每个 Agent 都可以专注在自己的职责上：
+- PlanningAgent 负责判断
+- QAAgent 负责回答
+- ToolAgent 负责执行工具
 
-为什么即便只有一个 Agent 也要先加编排器：
-因为这是一个很关键的工程边界。
-提前把边界划出来，后续扩展会轻松很多。
+这会让系统更清晰，也更容易扩展。
+--------------------------------------------------
+
+概念解释注释块：如何扩展更多 Agent
+--------------------------------------------------
+当前我们实现的是：
+- PlanningAgent
+- QAAgent
+- ToolAgent
+
+以后如果要加新的能力，比如：
+- SearchAgent
+- CodeAgent
+- MemoryAgent
+
+通常只需要两步：
+1. 增加新的 Agent 文件
+2. 在 PlanningAgent 和 Orchestrator 中加一条新的路由规则
+
+这就是多 Agent 架构的扩展价值所在。
 --------------------------------------------------
 """
 
+from __future__ import annotations
+
+from uuid import uuid4
+
 from app.agents.base_agent import AgentResult
-from app.agents.simple_agent import SimpleAgent
+from app.agents.planning_agent import PlanningAgent
+from app.agents.qa_agent import QAAgent
+from app.agents.tool_agent import ToolAgent
 
 
 class Orchestrator:
     """
     这个类的作用：
-    作为当前系统的最小请求编排入口。
-
-    为什么在初始化时创建 `SimpleAgent`：
-    因为当前只有一个 Agent，直接持有它最简单直观。
-    后续如果 Agent 变多，可以把这里扩展成路由分发逻辑。
+    作为当前系统的多 Agent 总编排入口。
     """
 
     def __init__(self) -> None:
-        self.simple_agent = SimpleAgent()
+        self.planning_agent = PlanningAgent()
+        self.qa_agent = QAAgent()
+        self.tool_agent = ToolAgent()
 
-    def handle_chat(self, user_message: str) -> AgentResult:
+    def handle_chat(self, user_message: str, session_id: str | None = None) -> AgentResult:
         """
         这个方法的作用：
-        接收用户输入，并将其转发给当前负责处理聊天任务的 Agent。
-
-        为什么单独提供 `handle_chat`：
-        因为编排器对外暴露的应该是“业务动作”，
-        而不是内部某个 Agent 的具体方法名。
-
-        现在做了什么：
-        1. 接收用户消息
-        2. 调用 `simple_agent.run()`
-        3. 返回统一的 `AgentResult`
+        接收用户输入，先做规划，再分发到合适的 Agent。
         """
 
-        return self.simple_agent.run(user_message=user_message)
+        current_session_id = session_id or str(uuid4())
+
+        # 为什么这里需要知道 RAG 是否可用：
+        # 因为如果知识库根本还没加载，就不应该把请求分给 RAG 路径。
+        rag_available = self.qa_agent.rag_agent.rag_pipeline.vector_store.count() > 0
+
+        planning_result = self.planning_agent.plan(
+            user_message=user_message,
+            rag_available=rag_available,
+        )
+
+        intent = planning_result["intent"]
+        reason = planning_result["reason"]
+
+        planning_trace = [
+            {
+                "step": "planning_step",
+                "content": f"intent={intent}，reason={reason}",
+            }
+        ]
+
+        if intent == "tool":
+            agent_trace = {
+                "step": "agent_selection",
+                "content": "根据 PlanningAgent 的判断，选择 ToolAgent 执行工具请求。",
+            }
+            result = self.tool_agent.run(
+                user_message=user_message,
+                session_id=current_session_id,
+            )
+        elif intent == "rag":
+            agent_trace = {
+                "step": "agent_selection",
+                "content": "根据 PlanningAgent 的判断，选择 QAAgent 的 RAG 模式回答问题。",
+            }
+            result = self.qa_agent.run_rag(
+                user_message=user_message,
+                session_id=current_session_id,
+            )
+        else:
+            agent_trace = {
+                "step": "agent_selection",
+                "content": "根据 PlanningAgent 的判断，选择 QAAgent 的普通聊天模式。",
+            }
+            result = self.qa_agent.run_chat(
+                user_message=user_message,
+                session_id=current_session_id,
+            )
+
+        result.trace = planning_trace + [agent_trace] + result.trace
+        return result

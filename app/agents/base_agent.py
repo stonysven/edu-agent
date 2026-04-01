@@ -8,8 +8,10 @@
 
 例如：
 - 都需要接收用户输入
+- 都需要知道这条消息属于哪个 session
 - 都需要返回答案
 - 都需要返回执行轨迹 trace
+- 在多 Agent 架构里，通常还会带上 intent 和 sources
 
 如果没有一个基础约定，后续一旦增加多个 Agent，
 接口层和编排层就会很难统一调用它们。
@@ -59,15 +61,21 @@ class AgentResult:
     因为后续无论是 API 层还是 Orchestrator 层，
     都希望拿到一个结构稳定的结果。
 
-    这里包含三部分核心信息：
+    这里包含六部分核心信息：
     - answer：给用户的最终回答
     - agent：本次负责处理请求的 Agent 名称
+    - session_id：本次对话所属会话 ID
+    - intent：本次请求最终走的是哪条处理路径
     - trace：本次执行过程中的关键步骤
+    - sources：如果走的是 RAG，可返回引用来源
     """
 
     answer: str
     agent: str
+    session_id: str
+    intent: str
     trace: list[dict[str, str]] = field(default_factory=list)
+    sources: list[dict[str, object]] = field(default_factory=list)
 
 
 class BaseAgent(ABC):
@@ -86,13 +94,14 @@ class BaseAgent(ABC):
     """
 
     @abstractmethod
-    def run(self, user_message: str) -> AgentResult:
+    def run(self, user_message: str, session_id: str) -> AgentResult:
         """
         这个方法的作用：
         定义 Agent 的统一执行入口。
 
         参数说明：
         - `user_message`：用户输入的文本消息
+        - `session_id`：当前对话所属会话 ID
 
         返回说明：
         - 返回 `AgentResult`，其中包含最终回答和执行轨迹

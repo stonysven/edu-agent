@@ -96,6 +96,78 @@ class Settings(BaseSettings):
         alias="OPENAI_TIMEOUT_SECONDS",
     )
 
+    # 为什么增加 Redis 配置：
+    # 因为这一版要支持把对话历史优先存到 Redis 中。
+    # 这样服务重启后历史不容易丢失，也更适合未来扩展成多实例。
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        alias="REDIS_URL",
+    )
+
+    # 为什么把历史轮数也做成配置：
+    # 因为上下文长度策略是一个很常见、也很重要的可调参数。
+    # 做成配置后，后续调优不需要改代码。
+    memory_history_limit: int = Field(
+        default=5,
+        alias="MEMORY_HISTORY_LIMIT",
+    )
+
+    # 为什么增加 embedding 模型配置：
+    # 因为聊天模型和 embedding 模型通常不是同一个。
+    # RAG 检索依赖 embedding，所以必须把它单独配置出来。
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        alias="OPENAI_EMBEDDING_MODEL",
+    )
+
+    # 为什么还要把 embedding 的 API Key 和 Base URL 单独拆出来：
+    # 因为真实项目里，聊天模型和 embedding 模型不一定来自同一家服务。
+    # 例如：
+    # - chat 走智谱兼容接口
+    # - embedding 走 OpenAI 官方接口
+    #
+    # 如果它们共用同一组配置，会导致：
+    # - chat 可用，但 embedding 调错服务
+    # - 或 embedding 可用，但 chat 调错服务
+    #
+    # 所以这里把 embedding 的认证信息和地址独立出来，
+    # 让两条链路可以完全分开配置。
+    embedding_api_key: str = Field(
+        default="",
+        alias="EMBEDDING_API_KEY",
+    )
+    embedding_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        alias="EMBEDDING_BASE_URL",
+    )
+
+    # 为什么保留一个 embedding timeout：
+    # 虽然当前可以和聊天共用超时，但单独拆出来更利于后续微调。
+    embedding_timeout_seconds: int = Field(
+        default=60,
+        alias="EMBEDDING_TIMEOUT_SECONDS",
+    )
+
+    # 为什么增加 RAG chunk 配置：
+    # 因为 chunk 大小和 overlap 会直接影响检索质量。
+    # 做成配置后，后续调优会方便很多。
+    rag_chunk_size: int = Field(
+        default=500,
+        alias="RAG_CHUNK_SIZE",
+    )
+    rag_chunk_overlap: int = Field(
+        default=100,
+        alias="RAG_CHUNK_OVERLAP",
+    )
+
+    # 为什么增加 top_k：
+    # 因为 RAG 每次取回多少个相关 chunk，
+    # 会影响上下文质量和提示词长度。
+    rag_top_k: int = Field(
+        default=3,
+        alias="RAG_TOP_K",
+    )
+
     # 为什么把 `.env` 配置也写进 model_config：
     # 虽然上面已经调用了 `load_dotenv()`，
     # 但这里再声明一遍能让 Settings 的来源更明确、更自描述。
