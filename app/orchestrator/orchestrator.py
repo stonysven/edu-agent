@@ -70,7 +70,7 @@ class Orchestrator:
         self.qa_agent = QAAgent()
         self.tool_agent = ToolAgent()
 
-    def handle_chat(self, user_message: str, session_id: str | None = None) -> AgentResult:
+    async def handle_chat(self, user_message: str, session_id: str | None = None) -> AgentResult:
         """
         这个方法的作用：
         接收用户输入，先做规划，再分发到合适的 Agent。
@@ -82,7 +82,7 @@ class Orchestrator:
         # 因为如果知识库根本还没加载，就不应该把请求分给 RAG 路径。
         rag_available = self.qa_agent.rag_agent.rag_pipeline.vector_store.count() > 0
 
-        planning_result = self.planning_agent.plan(
+        planning_result = await self.planning_agent.plan(
             user_message=user_message,
             rag_available=rag_available,
         )
@@ -102,7 +102,7 @@ class Orchestrator:
                 "step": "agent_selection",
                 "content": "根据 PlanningAgent 的判断，选择 ToolAgent 执行工具请求。",
             }
-            result = self.tool_agent.run(
+            result = await self.tool_agent.run(
                 user_message=user_message,
                 session_id=current_session_id,
             )
@@ -111,7 +111,7 @@ class Orchestrator:
                 "step": "agent_selection",
                 "content": "根据 PlanningAgent 的判断，选择 QAAgent 的 RAG 模式回答问题。",
             }
-            result = self.qa_agent.run_rag(
+            result = await self.qa_agent.run_rag(
                 user_message=user_message,
                 session_id=current_session_id,
             )
@@ -120,7 +120,7 @@ class Orchestrator:
                 "step": "agent_selection",
                 "content": "根据 PlanningAgent 的判断，选择 QAAgent 的普通聊天模式。",
             }
-            result = self.qa_agent.run_chat(
+            result = await self.qa_agent.run_chat(
                 user_message=user_message,
                 session_id=current_session_id,
             )

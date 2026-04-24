@@ -40,7 +40,7 @@ class ToolAgent:
     def __init__(self) -> None:
         self.agent_name = "tool_agent"
 
-    def run(self, user_message: str, session_id: str) -> AgentResult:
+    async def run(self, user_message: str, session_id: str) -> AgentResult:
         """
         这个方法的作用：
         执行工具调用。

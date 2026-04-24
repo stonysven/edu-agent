@@ -38,6 +38,7 @@ from fastapi import FastAPI
 
 from app.api.routes import router as api_router
 from app.core.config import get_settings
+from app.core.rate_limiter import SimpleRateLimitMiddleware
 
 # 为什么先读取配置：
 # 因为创建应用时，标题、环境名、第三方服务配置等信息可能都会用到。
@@ -54,6 +55,16 @@ app = FastAPI(
     version="0.1.0",
     # 描述信息会展示在接口文档中，帮助团队快速理解服务用途。
     description="面向 AI Agent 系统的教学级 FastAPI 项目骨架。",
+)
+
+# 为什么在入口层加中间件：
+# 因为限流和并发保护属于“全局请求治理能力”。
+# 它应该在业务逻辑真正执行前就生效，而不是散落在每个接口里分别处理。
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    rate_limit_requests=settings.rate_limit_requests,
+    rate_limit_window_seconds=settings.rate_limit_window_seconds,
+    max_concurrent_requests=settings.max_concurrent_requests,
 )
 
 # 为什么使用 `include_router` 注册路由：

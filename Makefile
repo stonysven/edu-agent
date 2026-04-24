@@ -26,7 +26,7 @@ PORT := 8000
 # 为什么把这些目标声明为 .PHONY：
 # 因为这些目标表示“动作”，不是“生成某个同名文件”。
 # 这样可以避免目录里如果刚好有同名文件时，Make 错误地跳过执行。
-.PHONY: help venv install setup run dev stop clean
+.PHONY: help venv install setup run dev stop load-test clean
 
 help:
 	@echo "可用命令："
@@ -36,6 +36,7 @@ help:
 	@echo "  make run     - 启动 FastAPI 服务"
 	@echo "  make dev     - 一键安装并启动服务"
 	@echo "  make stop    - 停止当前占用 8000 端口的 uvicorn 进程"
+	@echo "  make load-test - 对 /api/chat 执行一次简单并发测试"
 	@echo "  make clean   - 删除虚拟环境"
 
 venv:
@@ -77,6 +78,13 @@ stop:
 	# 很多“明明改了配置却不生效”的问题，本质上是旧的 uvicorn 进程还占着端口。
 	# 这个命令会清理当前项目常见的 uvicorn 进程，方便重新启动。
 	-pkill -f "uvicorn app.main:app" || true
+
+load-test:
+	# 为什么提供这个命令：
+	# 并发优化是否有效，最好通过真实请求验证。
+	# 这个命令会调用一个简单的异步压测脚本，
+	# 帮助快速观察当前服务的吞吐和限流行为。
+	$(VENV_DIR)/bin/python scripts/concurrency_test.py --concurrency 10
 
 clean:
 	# 为什么提供 clean：

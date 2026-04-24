@@ -71,8 +71,18 @@ edu-agent/
   提供健康检查接口，用来确认服务是否正常启动
 - `POST /api/chat`
   提供最小可运行的 Agent 聊天接口，调用 LLM 返回真实结果
+- `POST /api/upload` + `POST /api/ask`
+  提供原始手写版 RAG 的入库与问答接口
+- `POST /api/upload-langchain` + `POST /api/ask-langchain`
+  提供 LangChain 版 RAG 的入库与问答接口
+- `POST /api/compare-rag`
+  同时执行两套 RAG，并返回对比结果
 - `.env` 配置加载
   当前已支持读取 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL`
+- 手写版 RAG
+  展示文档加载、切分、embedding、向量检索的底层实现
+- LangChain 版 RAG
+  展示工业项目中常见的框架化封装方式，文件位于 `app/rag/langchain_rag.py`
 
 ## 为什么当前实现保持简单
 
@@ -215,6 +225,103 @@ curl -X POST "http://127.0.0.1:8000/api/chat" \
 
 这样推进的好处是：
 每一步都能独立验证，不容易一下子把系统做得过于复杂。
+
+## RAG 双版本说明
+
+当前项目里，RAG 故意保留了两套实现，方便学习和对比：
+
+- 原始 RAG：`app/rag/rag_pipeline.py`
+  重点是把底层流程显式写出来，包括文档切分、embedding、向量存储、余弦相似度检索和上下文拼接
+- LangChain RAG：`app/rag/langchain_rag.py`
+  重点是展示工业项目如何把 embedding、Document、FAISS 向量库和检索接口交给 LangChain 生态组件管理
+
+### 原始 RAG vs LangChain RAG
+
+| 对比项 | 原始 RAG | LangChain RAG |
+| --- | --- | --- |
+| 文档结构 | 手写 `dict` | `LangChain Document` |
+| Embedding | 本地 `sentence-transformers` 封装 | `HuggingFaceEmbeddings` |
+| 向量库 | 手写内存列表 + 余弦相似度 | `FAISS` |
+| 检索逻辑 | 自己维护排序与相似度计算 | 由 LangChain + FAISS 封装 |
+| 学习价值 | 更容易理解底层原理 | 更接近工业工程实践 |
+| 扩展体验 | 灵活但很多基础设施要手写 | 更容易替换组件和组合链路 |
+
+### 为什么要同时保留两套实现
+
+- 只保留框架版，容易“会用但不懂底层”
+- 只保留手写版，后续做工业化扩展会重复造很多轮子
+
+所以这个项目当前的定位是：
+
+- 用原始 RAG 学原理
+- 用 LangChain RAG 学工程封装
+
+### LangChain RAG 的典型用法
+
+```python
+import asyncio
+
+from app.rag.langchain_rag import LangChainRAG
+
+async def main() -> None:
+    rag = LangChainRAG()
+    await rag.build_vector_store("data")
+    result = await rag.query("课程里是怎么解释 RAG 的？")
+    print(result["answer"])
+
+asyncio.run(main())
+```
+
+如果你还没有安装 LangChain 相关依赖，可以先执行：
+
+```bash
+pip install -r requirements.txt
+```
+
+### API 对比调用
+
+原始手写版 RAG：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/upload" \
+  -H "Content-Type: application/json" \
+  -d '{"directory":"data"}'
+
+curl -X POST "http://127.0.0.1:8000/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"课程里是怎么解释 RAG 的？"}'
+```
+
+LangChain 版 RAG：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/upload-langchain" \
+  -H "Content-Type: application/json" \
+  -d '{"directory":"data"}'
+
+curl -X POST "http://127.0.0.1:8000/api/ask-langchain" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"课程里是怎么解释 RAG 的？"}'
+```
+
+这样你就可以用同一批知识库，直接比较两套实现的：
+
+- 检索结果
+- trace
+- 最终回答质量
+
+如果你希望一次请求里直接拿到两边结果，还可以调用：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/compare-rag" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"课程里是怎么解释 RAG 的？"}'
+```
+
+注意：
+
+- 调用 `/api/compare-rag` 前，原始版和 LangChain 版都需要先各自完成一次入库
+- 这个接口会并行调用两边，所以更适合做同题对比和调试观察
 
 ## Makefile 命令说明
 

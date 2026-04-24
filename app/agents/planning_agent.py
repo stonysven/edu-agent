@@ -95,7 +95,7 @@ class PlanningAgent:
         "rag",
     ]
 
-    def plan(self, user_message: str, rag_available: bool) -> PlanningResult:
+    async def plan(self, user_message: str, rag_available: bool) -> PlanningResult:
         """
         这个方法的作用：
         根据用户输入和当前系统状态，判断应该走哪种处理路径。

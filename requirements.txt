@@ -29,19 +29,16 @@ pydantic>=2.8.0,<3.0.0
 pydantic-settings>=2.3.0,<3.0.0
 
 # httpx：
-# 负责发送 HTTP 请求。
-# 当前服务运行本身并不强依赖它，但在 FastAPI/Starlette 的 `TestClient`
-# 场景下会需要它。
-# 把它放进依赖中后，项目就能更顺畅地做本地接口验证和后续测试扩展。
+# 负责发送异步 HTTP 请求。
+# 当前项目已经用它来：
+# 1. 异步调用 LLM
+# 2. 异步调用 embedding
+# 3. 执行并发测试脚本
+# 它也是这次并发优化的关键依赖之一。
 httpx>=0.27.0,<1.0.0
 
-# requests：
-# 这是本次最小 Agent 版本真正调用 LLM 的 HTTP 客户端。
-# 之所以选择它，是因为语法简单、学习成本低，非常适合作为教学项目起点。
-requests>=2.32.0,<3.0.0
-
 # redis：
-# 这是本次 Memory 系统优先使用的存储客户端。
+# 这是本次 Memory 系统和 Cache 系统优先使用的存储客户端。
 # 如果本地没有 Redis 服务，代码会自动退回到内存版实现，
 # 但安装这个包后，项目就具备了直接接 Redis 的能力。
 redis>=5.0.0,<6.0.0
@@ -50,3 +47,22 @@ redis>=5.0.0,<6.0.0
 # FastAPI 处理表单和文件上传时会依赖这个包。
 # 这次为了支持真正的文件上传入库，需要把它补进来。
 python-multipart>=0.0.9,<1.0.0
+
+# sentence-transformers：
+# 用于在本地加载 `all-MiniLM-L6-v2` embedding 模型。
+# 这样 RAG 在构建向量和查询向量时，就不再依赖远程 OpenAI embedding 接口，
+# 安装后即可在本地直接运行：
+# `pip install sentence-transformers`
+sentence-transformers>=3.0.0,<4.0.0
+
+# LangChain 生态依赖：
+# 这几项依赖用于新增“工业化封装版”的 RAG 实现。
+# 其中：
+# - `langchain` 提供核心抽象
+# - `langchain-community` 提供 FAISS 等常用社区组件
+# - `langchain-huggingface` 提供本地 HuggingFace embedding 封装
+# - `faiss-cpu` 提供本地向量索引能力
+langchain>=0.3.0,<0.4.0
+langchain-community>=0.3.0,<0.4.0
+langchain-huggingface>=0.1.0,<0.2.0
+faiss-cpu>=1.8.0,<2.0.0

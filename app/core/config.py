@@ -148,6 +148,63 @@ class Settings(BaseSettings):
         alias="EMBEDDING_TIMEOUT_SECONDS",
     )
 
+    # 为什么增加并发与限流相关配置：
+    # AI 服务的单次请求通常比普通 CRUD 请求更重。
+    # 一个请求里可能包含：
+    # - 外部 LLM 调用
+    # - embedding 调用
+    # - 检索
+    # - 多 Agent 编排
+    #
+    # 如果完全不做并发保护，高峰期很容易把：
+    # 1. 本地 worker
+    # 2. 上游模型接口
+    # 3. 网络连接池
+    # 一起拖慢。
+    #
+    # 所以这里把“最大并发请求数”和“时间窗口限流”都做成配置。
+    max_concurrent_requests: int = Field(
+        default=20,
+        alias="MAX_CONCURRENT_REQUESTS",
+    )
+    rate_limit_requests: int = Field(
+        default=30,
+        alias="RATE_LIMIT_REQUESTS",
+    )
+    rate_limit_window_seconds: int = Field(
+        default=60,
+        alias="RATE_LIMIT_WINDOW_SECONDS",
+    )
+
+    # 为什么增加 embedding 并发数配置：
+    # 批量给知识库做 embedding 时，真正的瓶颈通常不在本地 CPU，
+    # 而在“同时对上游 embedding 服务发了多少请求”。
+    # 做成配置后，可以按供应商限额灵活调整。
+    embedding_max_concurrency: int = Field(
+        default=5,
+        alias="EMBEDDING_MAX_CONCURRENCY",
+    )
+
+    # 为什么增加缓存相关配置：
+    # AI 系统里最贵、最慢的通常不是本地 Python 逻辑，
+    # 而是外部模型调用。
+    # 所以缓存的价值会非常直接：
+    # - 命中一次，就少一次真实模型请求
+    # - 成本下降
+    # - 响应速度更快
+    cache_prefix: str = Field(
+        default="edu-agent:cache",
+        alias="CACHE_PREFIX",
+    )
+    llm_cache_ttl_seconds: int = Field(
+        default=600,
+        alias="LLM_CACHE_TTL_SECONDS",
+    )
+    embedding_cache_ttl_seconds: int = Field(
+        default=3600,
+        alias="EMBEDDING_CACHE_TTL_SECONDS",
+    )
+
     # 为什么增加 RAG chunk 配置：
     # 因为 chunk 大小和 overlap 会直接影响检索质量。
     # 做成配置后，后续调优会方便很多。

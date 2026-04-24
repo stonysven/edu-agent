@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import math
 
+from app.rag.embedding import EmbeddingClient
+
 
 StoredDocument = dict[str, object]
 
@@ -42,8 +44,9 @@ class InMemoryVectorStore:
     用 Python 列表在内存中保存文本 chunk 和它们的向量。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, embedding_client: EmbeddingClient | None = None) -> None:
         self._documents: list[StoredDocument] = []
+        self.embedding_client = embedding_client
 
     def add_documents(self, documents: list[StoredDocument]) -> None:
         """
@@ -60,6 +63,32 @@ class InMemoryVectorStore:
         """
 
         self._documents.clear()
+
+    async def similarity_search_by_text(
+        self,
+        query_text: str,
+        top_k: int = 3,
+    ) -> list[StoredDocument]:
+        """
+        这个方法的作用：
+        直接接收“原始查询文本”，并在内部使用本地 embedding 模型完成检索。
+
+        为什么要给 `vector_store` 增加这个入口：
+        因为这样向量库就不只是在“被动接收外部算好的 query embedding”，
+        而是能明确体现“检索阶段使用的是本地 embedding 模型”。
+
+        这里发生了两步：
+        1. 用本地 `sentence-transformers/all-MiniLM-L6-v2` 把 query 编码成向量
+        2. 再和文档向量计算余弦相似度
+
+        这也正是“本地 embedding 替代 OpenAI embedding”后的完整检索链路。
+        """
+
+        if self.embedding_client is None:
+            raise ValueError("vector_store 未配置 embedding_client，无法执行文本检索。")
+
+        query_embedding = await self.embedding_client.embed_query(query_text)
+        return self.similarity_search(query_embedding=query_embedding, top_k=top_k)
 
     def similarity_search(self, query_embedding: list[float], top_k: int = 3) -> list[StoredDocument]:
         """
@@ -93,6 +122,11 @@ class InMemoryVectorStore:
         """
         这个方法的作用：
         用纯 Python 标准库实现余弦相似度计算。
+
+        为什么这里仍然可以继续复用原来的相似度逻辑：
+        因为无论向量是来自 OpenAI embedding 还是本地 sentence-transformers，
+        只要它们都是同一个向量空间中的数值向量，
+        就可以继续使用余弦相似度比较语义接近程度。
         """
 
         if len(vector_a) != len(vector_b):

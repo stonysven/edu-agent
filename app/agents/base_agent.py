@@ -94,7 +94,7 @@ class BaseAgent(ABC):
     """
 
     @abstractmethod
-    def run(self, user_message: str, session_id: str) -> AgentResult:
+    async def run(self, user_message: str, session_id: str) -> AgentResult:
         """
         这个方法的作用：
         定义 Agent 的统一执行入口。

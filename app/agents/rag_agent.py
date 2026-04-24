@@ -33,28 +33,28 @@ class RAGAgent:
         self.rag_pipeline = rag_pipeline or RAGPipeline()
         self.agent_name = "rag_agent"
 
-    def load_knowledge_base(self, directory: str) -> dict[str, Any]:
+    async def load_knowledge_base(self, directory: str) -> dict[str, Any]:
         """
         这个方法的作用：
         触发知识库加载流程。
         """
 
-        return self.rag_pipeline.load_knowledge_base(directory=directory)
+        return await self.rag_pipeline.load_knowledge_base(directory=directory)
 
-    def load_uploaded_files(self, files: list[tuple[str, bytes]]) -> dict[str, Any]:
+    async def load_uploaded_files(self, files: list[tuple[str, bytes]]) -> dict[str, Any]:
         """
         这个方法的作用：
         触发上传文件入库流程。
         """
 
-        return self.rag_pipeline.load_uploaded_files(files=files)
+        return await self.rag_pipeline.load_uploaded_files(files=files)
 
-    def ask(self, question: str) -> dict[str, Any]:
+    async def ask(self, question: str) -> dict[str, Any]:
         """
         这个方法的作用：
         执行一次基于知识库的问答。
         """
 
-        result = self.rag_pipeline.ask(question=question)
+        result = await self.rag_pipeline.ask(question=question)
         result["agent"] = self.agent_name
         return result

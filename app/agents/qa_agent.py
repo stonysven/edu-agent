@@ -39,13 +39,13 @@ class QAAgent:
         self.rag_agent = rag_agent or RAGAgent()
         self.agent_name = "qa_agent"
 
-    def run_chat(self, user_message: str, session_id: str) -> AgentResult:
+    async def run_chat(self, user_message: str, session_id: str) -> AgentResult:
         """
         这个方法的作用：
         走普通聊天模式回答问题。
         """
 
-        chat_result = self.chat_agent.run(
+        chat_result = await self.chat_agent.run(
             user_message=user_message,
             session_id=session_id,
         )
@@ -58,13 +58,13 @@ class QAAgent:
             sources=[],
         )
 
-    def run_rag(self, user_message: str, session_id: str) -> AgentResult:
+    async def run_rag(self, user_message: str, session_id: str) -> AgentResult:
         """
         这个方法的作用：
         走 RAG 模式回答问题。
         """
 
-        rag_result = self.rag_agent.ask(question=user_message)
+        rag_result = await self.rag_agent.ask(question=user_message)
         return AgentResult(
             answer=rag_result["answer"],
             agent=self.agent_name,
